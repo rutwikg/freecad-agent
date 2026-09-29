@@ -1,5 +1,8 @@
 """Starts the freecad-mcp server pointed at one specific FreeCAD instance.
 
+freecad-mcp is by neka-nat (https://github.com/neka-nat/freecad-mcp, MIT licence); this
+launcher uses it unmodified and only changes which RPC port it connects to.
+
 freecad-mcp hard-codes RPC port 9875, and FreeCAD's XML-RPC server binds with
 SO_REUSEADDR, so on Windows several FreeCAD windows can all listen on 9875 and
 MCP calls land in whichever one Windows picks. The FreeCAD Agent dock gives its

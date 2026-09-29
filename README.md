@@ -226,6 +226,15 @@ no diff view for file edits, basic plan-mode and question dialogs, no live MCP t
 the Anthropic backend is untested, and Windows is the only platform tried.
 See `CHANGELOG.md`.
 
+## Acknowledgements
+
+The FreeCAD tools the agent uses come from **[freecad-mcp](https://github.com/neka-nat/freecad-mcp)
+by neka-nat** (MIT licence): the FreeCAD addon with its RPC server, and the MCP server that
+talks to it. This project is built to work with it (tested with 0.1.22) and does not modify
+it; `packs/freecad-1.1/mcp/freecad_mcp_launcher.py` only points it at the private port the
+panel gives its own FreeCAD window. Many thanks to neka-nat for making FreeCAD reachable
+from agents in the first place.
+
 ## Licence and third-party software
 
 This repository is licensed under the **GNU Affero General Public License v3.0** (see
