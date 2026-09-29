@@ -1,0 +1,82 @@
+{
+  "default": {
+    "backend": "ollama",
+    "model": "qwen3.8:27b"
+  },
+  "backends": {
+    "ollama": {
+      "base_url": "http://localhost:11434",
+      "auth_token": "ollama",
+      "context_window": 65536,
+      "idle_unload_seconds": 120,
+      "max_output_tokens": 16384,
+      "unload_on_close": true,
+      "models": [
+        "qwen3.8:27b",
+        "gemma4:12b",
+        "gemma4:26b",
+        "gemma4:31b"
+      ],
+      "attachment_char_budget": 60000,
+      "kind": "ollama"
+    },
+    "vast": {
+      "kind": "ollama",
+      "label": "Vast.ai GPU",
+      "paid": true,
+      "base_url": "(set by the tunnel)",
+      "auth_token": "ollama",
+      "tunnel": {
+        "provider": "vast",
+        "local_port": 0
+      },
+      "ssh_key": "~/.ssh/openclaudecode_vast_ed25519",
+      "context_window": 131072,
+      "max_output_tokens": 16384,
+      "attachment_char_budget": 200000,
+      "idle_unload_seconds": 0,
+      "unload_on_close": false,
+      "models": [
+        "qwen3.8:27b-q8_0"
+      ],
+      "idle_destroy_minutes": 20,
+      "watchdog_minutes": 30,
+      "home_region": "Europe"
+    },
+    "anthropic": {
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "models": [
+        "claude-sonnet-5",
+        "claude-opus-5-5",
+        "claude-haiku-4-5-20251001"
+      ],
+      "attachment_char_budget": 400000,
+      "kind": "anthropic"
+    }
+  },
+  "disallowed_tools": [
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "EnterWorktree",
+    "ExitWorktree",
+    "NotebookEdit",
+    "ReportFindings",
+    "ScheduleWakeup",
+    "SendMessage",
+    "ListAgents",
+    "Workflow",
+    "TaskStop",
+    "WebSearch"
+  ],
+  "mcp_wait_seconds": 30,
+  "packs": [
+    "packs/freecad-1.1"
+  ],
+  "userplugins": "userplugins",
+  "runtime": "runtime",
+  "default_thinking": {
+    "ollama": "low",
+    "vast": "low"
+  }
+}

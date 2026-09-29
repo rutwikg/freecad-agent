@@ -1,0 +1,5 @@
+{
+  "name": "freecad",
+  "version": "0.1.0",
+  "description": "FreeCAD 1.1 agent pack: skills, subagents, commands and MCP for FreeCAD"
+}

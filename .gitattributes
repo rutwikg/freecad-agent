@@ -1,0 +1,7 @@
+# Normalise line endings: LF in the repository, native in the working copy.
+* text=auto eol=lf
+# Batch files must keep CRLF or cmd.exe can mis-parse them.
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.FCStd binary

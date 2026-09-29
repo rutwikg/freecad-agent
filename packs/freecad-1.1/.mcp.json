@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "freecad": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/../../.venv/Scripts/python.exe",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/freecad_mcp_launcher.py"]
+    }
+  }
+}
