@@ -168,7 +168,7 @@ class ActivityBar(QtWidgets.QWidget):
         self.toggle.toggled.connect(self._toggled)
         self.pane = QtWidgets.QPlainTextEdit()
         self.pane.setReadOnly(True)
-        self.pane.setMaximumHeight(140)
+        self.pane.setMinimumHeight(30)  # height set by the splitter in ChatWidget
         self.pane.setStyleSheet("color: gray; font-style: italic;")
         row = QtWidgets.QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -228,6 +228,10 @@ class ActivityBar(QtWidgets.QWidget):
     def _toggled(self, on: bool) -> None:
         self.toggle.setText("hide thinking ▾" if on else "show thinking ▸")
         self.pane.setVisible(on)
+        # With the pane hidden only the status line remains, so do not let the splitter
+        # hand this widget empty space.
+        line = max(self.label.sizeHint().height(), self.toggle.sizeHint().height())
+        self.setMaximumHeight(16777215 if on else line)
 
     def _tick(self) -> None:
         now = time.monotonic()
@@ -462,7 +466,7 @@ class ChatWidget(QtWidgets.QWidget):
         self.input = ChatInput()
         self.input.files_added.connect(self._add_files)
         self.input.setPlaceholderText("Message, / for commands, or drop files and images here …  (Ctrl+Enter to send)")
-        self.input.setFixedHeight(80)
+        self.input.setMinimumHeight(40)  # height set by the splitter
         QShortcut(QtGui.QKeySequence("Ctrl+Return"), self.input, activated=self.send_prompt)
         self.palette = CommandPalette(self.input)
         self.palette.set_commands([], LOCAL_COMMANDS)
@@ -506,12 +510,34 @@ class ChatWidget(QtWidgets.QWidget):
         self.ctx.setFormat("context –")
         self.ctx.setStyleSheet("QProgressBar { font-size: 10px; }")
 
+        # Conversation, thinking and prompt share a splitter, so the user can drag the
+        # dividers; the sizes are remembered across tabs and restarts.
+        prompt_box = QtWidgets.QWidget()
+        pl = QtWidgets.QVBoxLayout(prompt_box)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.addWidget(self.palette)
+        pl.addWidget(self.input, 1)
+        self.panes = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.panes.addWidget(self.transcript)
+        self.panes.addWidget(self.activity)
+        self.panes.addWidget(prompt_box)
+        self.panes.setChildrenCollapsible(False)
+        self.panes.setStretchFactor(0, 1)
+        self.panes.setStretchFactor(1, 0)
+        self.panes.setStretchFactor(2, 0)
+        self.panes.setSizes([400, 120, 80])
+        saved = self.state.get("pane_sizes")
+        if saved:
+            self.panes.restoreState(QtCore.QByteArray.fromHex(saved.encode("ascii")))
+        self._panes_save = QtCore.QTimer(self)
+        self._panes_save.setSingleShot(True)
+        self._panes_save.timeout.connect(
+            lambda: _write_state(pane_sizes=bytes(self.panes.saveState().toHex()).decode("ascii")))
+        self.panes.splitterMoved.connect(lambda *_: self._panes_save.start(400))
+
         lay = QtWidgets.QVBoxLayout(self)
         lay.addLayout(top)
-        lay.addWidget(self.transcript, 1)
-        lay.addWidget(self.activity)
-        lay.addWidget(self.palette)
-        lay.addWidget(self.input)
+        lay.addWidget(self.panes, 1)
         lay.addLayout(buttons)
         lay.addWidget(self.ctx)
         lay.addWidget(self.status)
@@ -1234,18 +1260,25 @@ class ChatPanel(QtWidgets.QWidget):
         # Cost guard: visible whenever a rented GPU exists, so it is never forgotten.
         self.cloud = {}
         self.cloud_label = QtWidgets.QLabel()
-        self.cloud_label.setStyleSheet("color: #c60; font-weight: bold;")
-        destroy = QtWidgets.QPushButton("Destroy GPU")
+        self.cloud_label.setStyleSheet("color: #c60; font-weight: bold; font-size: 11px;")
+        # One line that may be clipped in a narrow dock; the full detail is in the tooltip.
+        self.cloud_label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        destroy = QtWidgets.QToolButton()
+        destroy.setText("Destroy GPU")
         destroy.setToolTip("Delete the rented instance now and stop billing")
         destroy.clicked.connect(self.destroy_cloud)
-        self.start_btn = QtWidgets.QPushButton("Start")
+        self.start_btn = QtWidgets.QToolButton()
+        self.start_btn.setText("Start")
         self.start_btn.setToolTip("Resume the stopped instance (the model is still on its disk)")
         self.start_btn.clicked.connect(self.start_cloud)
         self.start_btn.hide()
         self.cloud_bar = QtWidgets.QFrame()
-        self.cloud_bar.setStyleSheet("QFrame { border: 1px solid #c60; border-radius: 4px; }")
+        self.cloud_bar.setObjectName("cloudBar")  # so the border does not reach the label (a QFrame too)
+        self.cloud_bar.setStyleSheet("QFrame#cloudBar { border: 1px solid #c60; border-radius: 3px; }")
+        self.cloud_bar.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         bar = QtWidgets.QHBoxLayout(self.cloud_bar)
-        bar.setContentsMargins(6, 2, 6, 2)
+        bar.setContentsMargins(4, 1, 2, 1)
+        bar.setSpacing(4)
         bar.addWidget(self.cloud_label, 1)
         bar.addWidget(self.start_btn)
         bar.addWidget(destroy)
@@ -1256,13 +1289,18 @@ class ChatPanel(QtWidgets.QWidget):
         self.last_active = time.monotonic()
         self.countdown = 0
         self.idle_label = QtWidgets.QLabel()
-        self.idle_label.setStyleSheet("color: #b00; font-weight: bold;")
-        keep = QtWidgets.QPushButton("Keep running")
+        self.idle_label.setStyleSheet("color: #b00; font-weight: bold; font-size: 11px;")
+        self.idle_label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Fixed)
+        keep = QtWidgets.QToolButton()
+        keep.setText("Keep running")
         keep.clicked.connect(self.keep_cloud)
         self.idle_bar = QtWidgets.QFrame()
-        self.idle_bar.setStyleSheet("QFrame { border: 1px solid #b00; border-radius: 4px; }")
+        self.idle_bar.setObjectName("idleBar")
+        self.idle_bar.setStyleSheet("QFrame#idleBar { border: 1px solid #b00; border-radius: 3px; }")
+        self.idle_bar.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         ib = QtWidgets.QHBoxLayout(self.idle_bar)
-        ib.setContentsMargins(6, 2, 6, 2)
+        ib.setContentsMargins(4, 1, 2, 1)
+        ib.setSpacing(4)
         ib.addWidget(self.idle_label, 1)
         ib.addWidget(keep)
         self.idle_bar.hide()
@@ -1337,16 +1375,23 @@ class ChatPanel(QtWidgets.QWidget):
         state = m.get("state") or "starting"
         gpu = m.get("gpu") or "Vast GPU"
         if state == "stopped":
-            text = f"\u2601 {gpu} \u00b7 stopped (storage only; model kept) \u00b7 ${m.get('cost_so_far', 0):.2f} so far"
+            text = f"\u2601 {gpu} \u00b7 stopped \u00b7 ${m.get('cost_so_far', 0):.2f}"
+            tip = (f"{gpu}: stopped (storage only; the model is kept on its disk)\n"
+                   f"${m.get('cost_so_far', 0):.2f} so far")
         else:
             text = (f"\u2601 {gpu} \u00b7 {state} \u00b7 ${m.get('price_h', 0):.2f}/h \u00b7 "
-                    f"{m.get('hours', 0):.1f} h \u00b7 ${m.get('cost_so_far', 0):.2f} so far")
+                    f"${m.get('cost_so_far', 0):.2f}")
+            tip = (f"{gpu}: {state}\n${m.get('price_h', 0):.2f}/h \u00b7 {m.get('hours', 0):.1f} h \u00b7 "
+                   f"${m.get('cost_so_far', 0):.2f} so far")
             if "gpu_util" in m:
-                text += (f"\n     GPU {m['gpu_util']}% \u00b7 {m['gpu_mem_used_gb']:.0f}/{m['gpu_mem_total_gb']} GB"
-                         f" \u00b7 idle {m.get('idle_min', 0)} min (auto-destroy at {self.idle_minutes}"
-                         + (f", instance stops itself at {m['watchdog_limit_min']}" if m.get("watchdog_limit_min") else "")
-                         + ")")
+                text += f" \u00b7 GPU {m['gpu_util']}% \u00b7 idle {m.get('idle_min', 0)}/{self.idle_minutes} min"
+                tip += (f"\nGPU {m['gpu_util']}% busy \u00b7 {m['gpu_mem_used_gb']:.0f}/{m['gpu_mem_total_gb']} GB"
+                        f"\nidle {m.get('idle_min', 0)} min; auto-destroy at {self.idle_minutes} min"
+                        + (f"; the instance stops itself at {m['watchdog_limit_min']} min"
+                           if m.get("watchdog_limit_min") else ""))
         self.cloud_label.setText(text)
+        self.cloud_label.setToolTip(tip)
+        self.cloud_bar.setToolTip(tip)
         self.start_btn.setVisible(state == "stopped")
         self.cloud_bar.show()
         for tab in self.chats():
@@ -1355,7 +1400,7 @@ class ChatPanel(QtWidgets.QWidget):
     def start_cloud(self) -> None:
         self.last_active = time.monotonic()
         self.engine.send({"type": "cloud.start", "instance_id": self.cloud.get("instance_id")})
-        self.cloud_label.setText(self.cloud_label.text().split("\n")[0] + "  (starting\u2026)")
+        self.cloud_label.setText(self.cloud_label.text() + "  (starting\u2026)")
 
     def mark_cloud_active(self) -> None:
         self.last_active = time.monotonic()

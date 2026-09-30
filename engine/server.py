@@ -180,9 +180,31 @@ def backend_env(backend: str, model: str) -> dict[str, str]:
             # too late and Ollama would silently truncate. Match Ollama's real context.
             "CLAUDE_CODE_MAX_CONTEXT_TOKENS": str(cfg.get("context_window", 65536)),
         }
+    elif kind(backend) == "anthropic" and cfg.get("auth") == "login":
+        # Trial: the Claude account logged in inside runtime/claude-config (/login there).
+        # An API key in the environment would take precedence, so blank it.
+        env["ANTHROPIC_API_KEY"] = ""
     elif kind(backend) == "anthropic":
-        env["ANTHROPIC_API_KEY"] = os.environ.get(cfg["api_key_env"], "")
+        env["ANTHROPIC_API_KEY"] = api_key(backend)
     return env
+
+
+def api_key(backend: str) -> str:
+    """The backend's API key: from its environment variable, else from its key file under
+    runtime/ (git-ignored). The file is read at every chat start, so no restart is needed."""
+    cfg = CONFIG["backends"][backend]
+    key = os.environ.get(cfg.get("api_key_env", ""), "").strip()
+    if not key and cfg.get("api_key_file"):
+        try:
+            key = (ROOT / CONFIG["runtime"] / cfg["api_key_file"]).read_text(encoding="utf-8-sig").strip()  # Notepad may add a BOM
+        except OSError:
+            pass
+    if not key:
+        where = f"the {cfg.get('api_key_env')} environment variable"
+        if cfg.get("api_key_file"):
+            where += f" or the file {CONFIG['runtime']}/{cfg['api_key_file']}"
+        raise RuntimeError(f"no API key for '{backend}': put it in {where}")
+    return key
 
 
 def backend_url(backend: str) -> str:

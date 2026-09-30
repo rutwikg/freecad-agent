@@ -45,13 +45,24 @@
     },
     "anthropic": {
       "api_key_env": "ANTHROPIC_API_KEY",
+      "api_key_file": "secrets/anthropic_api_key.txt",
       "models": [
-        "claude-sonnet-5",
+        "claude-sonnet-5-5",
         "claude-opus-5-5",
         "claude-haiku-4-5-20251001"
       ],
       "attachment_char_budget": 400000,
       "kind": "anthropic"
+    },
+    "claude-login": {
+      "kind": "anthropic",
+      "auth": "login",
+      "label": "Claude login (trial)",
+      "models": [
+        "claude-opus-5-5",
+        "claude-sonnet-5-5"
+      ],
+      "attachment_char_budget": 400000
     }
   },
   "disallowed_tools": [
